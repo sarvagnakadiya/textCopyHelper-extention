@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const texts = result.texts || {};
         texts[key] = value;
         chrome.storage.sync.set({ texts }, () => {
-          //   alert("Text added successfully!");
+          alert("Text added successfully!");
           keyInput.value = "";
           valueInput.value = "";
         });

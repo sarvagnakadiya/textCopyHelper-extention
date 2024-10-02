@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Text Manager",
+  "name": "QuickCopy",
   "version": "1.0",
   "permissions": ["storage", "clipboardWrite"],
   "action": {

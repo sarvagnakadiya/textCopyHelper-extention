@@ -1,6 +1,7 @@
-How to add this extention
-clone the repo
+# How to add this extention
+
 ### step 1
+clone this repo
 ```shell
 git clone https://github.com/sarvagnakadiya/textCopyHelper-extention.git
 ```

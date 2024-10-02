@@ -2,37 +2,54 @@ document.addEventListener("DOMContentLoaded", () => {
   const textList = document.getElementById("textList");
   const navigateToAddPage = document.getElementById("navigateToAddPage");
   let draggedItem = null;
+  let texts = {};
+  let order = [];
 
-  // Load texts from storage
-  chrome.storage.sync.get(["texts"], (result) => {
-    const texts = result.texts || {};
-    renderTextList(texts);
+  // Load texts and order from storage
+  chrome.storage.sync.get(["texts", "order"], (result) => {
+    texts = result.texts || {};
+    order = result.order || Object.keys(texts);
+    renderTextList();
   });
 
-  // Function to render the text list
-  function renderTextList(texts) {
-    textList.innerHTML = "";
-    for (const [key, value] of Object.entries(texts)) {
-      const li = document.createElement("li");
-      li.classList.add("draggable");
-      li.setAttribute("draggable", true); // Set the element as draggable
-      li.innerHTML = `
-          <div class="textItem">
-            <span class="textKey" data-value="${value}">${key}</span>
-            <button class="deleteButton" data-key="${key}" title="Delete">&#128465;</button>
-          </div>
-        `;
-      textList.appendChild(li);
+  // Function to render the text list using DocumentFragment for better performance
+  function renderTextList() {
+    const fragment = document.createDocumentFragment(); // Use DocumentFragment to minimize reflows
 
-      // Add drag event listeners
-      li.addEventListener("dragstart", handleDragStart);
-      li.addEventListener("dragover", handleDragOver);
-      li.addEventListener("drop", handleDrop);
-      li.addEventListener("dragend", handleDragEnd);
-    }
+    order.forEach((key) => {
+      if (texts[key]) {
+        const value = texts[key];
+        const li = createListItem(key, value);
+        fragment.appendChild(li);
+      }
+    });
+
+    textList.innerHTML = ""; // Clear current content
+    textList.appendChild(fragment); // Append all items at once
   }
 
-  // Copy text to clipboard by clicking on the key
+  // Function to create a list item element
+  function createListItem(key, value) {
+    const li = document.createElement("li");
+    li.classList.add("draggable");
+    li.setAttribute("draggable", true);
+    li.innerHTML = `
+        <div class="textItem">
+          <span class="textKey" data-value="${value}">${key}</span>
+          <button class="deleteButton" data-key="${key}" title="Delete">&#128465;</button>
+        </div>
+      `;
+
+    // Add drag and drop listeners
+    li.addEventListener("dragstart", handleDragStart);
+    li.addEventListener("dragover", handleDragOver);
+    li.addEventListener("drop", handleDrop);
+    li.addEventListener("dragend", handleDragEnd);
+
+    return li;
+  }
+
+  // Copy text to clipboard
   textList.addEventListener("click", (event) => {
     if (event.target.classList.contains("textKey")) {
       const value = event.target.getAttribute("data-value");
@@ -46,16 +63,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Delete text
+  // Delete text and update the order array
   textList.addEventListener("click", (event) => {
     if (event.target.classList.contains("deleteButton")) {
       const key = event.target.getAttribute("data-key");
-      chrome.storage.sync.get(["texts"], (result) => {
-        const texts = result.texts || {};
-        delete texts[key];
-        chrome.storage.sync.set({ texts }, () => {
-          renderTextList(texts);
-        });
+
+      delete texts[key];
+      order = order.filter((item) => item !== key);
+
+      chrome.storage.sync.set({ texts, order }, () => {
+        const li = event.target.closest("li");
+        li.remove(); // Remove the list item without re-rendering the whole list
       });
     }
   });
@@ -74,7 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function handleDragOver(event) {
-    event.preventDefault(); // Allow dropping
+    event.preventDefault();
     const targetItem = event.target.closest(".draggable");
     if (targetItem && targetItem !== draggedItem) {
       textList.insertBefore(draggedItem, targetItem);
@@ -83,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function handleDrop(event) {
     event.preventDefault();
-    saveReorderedTexts();
+    saveReorderedTextsDebounced(); // Save after reordering
   }
 
   function handleDragEnd() {
@@ -91,15 +109,24 @@ document.addEventListener("DOMContentLoaded", () => {
     draggedItem = null;
   }
 
-  // Save reordered texts to chrome storage
-  function saveReorderedTexts() {
-    const newTexts = {};
-    const items = textList.querySelectorAll(".draggable");
-    items.forEach((item) => {
-      const key = item.querySelector(".textKey").textContent;
-      const value = item.querySelector(".textKey").getAttribute("data-value");
-      newTexts[key] = value;
-    });
-    chrome.storage.sync.set({ texts: newTexts });
+  // Debounced save function to avoid frequent storage writes
+  const saveReorderedTextsDebounced = debounce(() => {
+    const newOrder = Array.from(textList.querySelectorAll(".draggable")).map(
+      (item) => item.querySelector(".textKey").textContent
+    );
+
+    order = newOrder;
+    chrome.storage.sync.set({ order });
+  }, 500);
+
+  // Debounce function to limit how often a function can be called
+  function debounce(func, delay) {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+      }, delay);
+    };
   }
 });

@@ -1,3 +1,5 @@
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({ texts: {} });
+  chrome.storage.local.set({ texts: {}, order: [] }, () => {
+    // console.log("Storage initialized.");
+  });
 });

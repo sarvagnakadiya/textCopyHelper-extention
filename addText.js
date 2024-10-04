@@ -8,10 +8,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const key = keyInput.value.trim();
     const value = valueInput.value.trim();
     if (key && value) {
-      chrome.storage.sync.get(["texts"], (result) => {
+      chrome.storage.local.get(["texts", "order"], (result) => {
         const texts = result.texts || {};
+        const order = result.order || [];
+
         texts[key] = value;
-        chrome.storage.sync.set({ texts }, () => {
+        order.push(key);
+
+        chrome.storage.local.set({ texts, order }, () => {
           alert("Text added successfully!");
           keyInput.value = "";
           valueInput.value = "";

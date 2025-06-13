@@ -5,17 +5,43 @@ document.addEventListener("DOMContentLoaded", () => {
   let texts = {};
   let order = [];
 
-  // Load texts and order from storage
-  chrome.storage.local.get(["texts", "order"], (result) => {
-    // console.log("Loaded from local storage:", result);
+  // Add loading state
+  function showLoading() {
+    textList.innerHTML = '<div class="loading">Loading...</div>';
+  }
+
+  function hideLoading() {
+    const loadingElement = textList.querySelector(".loading");
+    if (loadingElement) {
+      loadingElement.remove();
+    }
+  }
+
+  // Check storage permissions and load data
+  showLoading();
+  chrome.storage.sync.get(["texts", "order"], (result) => {
+    if (chrome.runtime.lastError) {
+      console.error("Storage error:", chrome.runtime.lastError);
+      alert("Error accessing storage. Please check extension permissions.");
+      hideLoading();
+      return;
+    }
+
     texts = result.texts || {};
     order = result.order || Object.keys(texts);
     renderTextList();
+    hideLoading();
   });
 
   // Function to render the text list
   function renderTextList() {
     const fragment = document.createDocumentFragment();
+
+    if (order.length === 0) {
+      textList.innerHTML =
+        '<div class="empty-state">No saved texts yet. Click "Add Text" to get started!</div>';
+      return;
+    }
 
     order.forEach((key) => {
       if (texts[key]) {
@@ -71,7 +97,12 @@ document.addEventListener("DOMContentLoaded", () => {
       delete texts[key];
       order = order.filter((item) => item !== key);
 
-      chrome.storage.local.set({ texts, order }, () => {
+      chrome.storage.sync.set({ texts, order }, () => {
+        if (chrome.runtime.lastError) {
+          console.error("Error saving data:", chrome.runtime.lastError);
+          alert("Error saving changes. Please try again.");
+          return;
+        }
         const li = event.target.closest("li");
         li.remove();
       });
@@ -117,7 +148,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     order = newOrder;
 
-    chrome.storage.local.set({ order });
+    chrome.storage.sync.set({ order }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("Error saving order:", chrome.runtime.lastError);
+      }
+    });
   }, 500);
 
   // Debounce function to limit how often a function can be called
